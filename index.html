@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor de Simulação e Análise - Lotofácil Master</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e5e5e5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Paineis e Cards */
+        .dashboard-panel {
+            background-color: #1e1e2f;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+        }
+
+        .simulator-panel {
+            background-color: #0b1e26;
+            border: 2px solid #3b82f6;
+        }
+
+        .stat-box {
+            background-color: #2a2a40;
+            border-radius: 8px;
+            padding: 15px;
+            border-left: 4px solid #3b82f6;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stat-box.cycle-box { border-left-color: #10b981; }
+        .stat-box.gold-box { border-left-color: #fbbf24; }
+        .stat-box.alert-box { border-left-color: #f59e0b; }
+
+        .stat-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* Elementos de Dezenas */
+        .dezena-ciclo, .dezena-bola {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background-color: #10b981;
+            color: #000;
+            font-weight: bold;
+            border-radius: 50%;
+            margin: 2px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+        }
+        .dezena-bola.neutra { background-color: #374151; color: #fff; }
+        .dezena-bola.acerto { background-color: #fbbf24; color: #000; } 
+        .dezena-bola.pequena { width: 24px; height: 24px; font-size: 11px; margin: 1px; }
+
+        /* Matrizes Reais (Histórico Inferior) */
+        .resultado-card {
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            width: fit-content;
+            margin: 0 auto;
+            color: #000; 
+        }
+        .card-header {
+            background-color: #0b1e26;
+            color: #00ff00;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 900;
+            padding: 8px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+        }
+        .dezena-ausente { background-color: #ffffff; color: #000000; }
+        .dezena-sorteada { background-color: #00ff00; color: #0000ff; }
+
+        /* Matrizes Simuladas e Painel de Placar */
+        .simulado-card {
+            background-color: #1e293b; 
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+            width: fit-content;
+            margin: 0 auto;
+            color: #e2e8f0; 
+            border: 2px solid #3b82f6;
+            transition: all 0.2s ease;
+        }
+        /* Efeito visual flash ao bater 14 pts (subliminar durante o loop) */
+        .simulado-card.destaque-14 {
+            border-color: #f97316; 
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.8);
+        }
+
+        .placar-card {
+            background-color: #1e293b; 
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+            color: #e2e8f0; 
+            border: 1px solid #10b981; 
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+        .simulado-header {
+            background-color: #172554; 
+            color: #60a5fa; 
+            text-align: center;
+            font-size: 1.15rem;
+            font-weight: 900;
+            padding: 8px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .simulado-card.destaque-14 .simulado-header {
+            background-color: #7c2d12;
+            color: #fdba74;
+            border-bottom-color: #f97316;
+        }
+
+        .placar-header {
+            background-color: #064e3b; 
+            color: #34d399; 
+            text-align: center;
+            font-size: 1.15rem;
+            font-weight: 900;
+            padding: 8px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #10b981;
+        }
+        .simulado-ausente { background-color: #334155; color: #64748b; border: 1px solid #1e293b; }
+        .simulado-sorteada { background-color: #3b82f6; color: #ffffff; border: 1px solid #1e293b; box-shadow: inset 0 0 5px rgba(0,0,0,0.3); }
+        .simulado-soma {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #94a3b8;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: transparent;
+        }
+        .simulado-stats-table {
+            display: grid;
+            grid-template-columns: 115px 1fr; 
+            border-top: 2px solid #3b82f6;
+            padding: 0 5px 5px 5px;
+            margin-top: 2px;
+            background-color: #0f172a;
+        }
+        .simulado-label, .simulado-value {
+            border: 1px solid #1e293b;
+            padding: 2px 5px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+        }
+        .simulado-label { font-style: italic; font-weight: bold; border-right: none; color: #94a3b8; }
+        .simulado-value { justify-content: center; font-weight: bold; font-family: 'Courier New', Courier, monospace; color: #38bdf8; }
+        .simulado-row:first-child .simulado-label, .simulado-row:first-child .simulado-value { border-top: none; }
+
+        /* Comum para a Grid das Matrizes */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 35px repeat(5, 40px);
+            grid-template-rows: repeat(5, 30px) 30px;
+            gap: 0;
+            padding: 5px 5px 0 5px; 
+        }
+        .celula {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .celula-soma {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #555;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: transparent;
+        }
+        .stats-table {
+            display: grid;
+            grid-template-columns: 115px 1fr; 
+            border-top: 2px solid #000;
+            padding: 0 5px 5px 5px;
+            margin-top: 2px;
+        }
+        .stat-row { display: contents; }
+        .stat-label, .stat-value {
+            border: 1px solid #000;
+            padding: 2px 5px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .stat-label { font-style: italic; font-weight: bold; background-color: #ffffff; border-right: none; }
+        .stat-value { justify-content: center; font-weight: bold; font-family: 'Courier New', Courier, monospace; background-color: #ffffff; }
+        .stat-row:first-child .stat-label, .stat-row:first-child .stat-value { border-top: none; }
+
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #f97316; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <div class="mb-6 border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-white mb-2">Motor de Simulação - LotoFácil Master</h1>
+            <p class="text-gray-400">Motor Dinâmico Avançado: A Trinca se adapta automaticamente ao novo histórico a cada rodada.</p>
+        </div>
+
+        <div class="dashboard-panel simulator-panel">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Laboratório de Mundos Paralelos (R$ 3,50 / jogo)</h2>
+                    <p class="text-sm text-gray-400">Deixe rodar. O sistema avança o tempo, recalcula filtros e gera jogos novos sozinho até 15pts.</p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="acaoGerarTrincaManual()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded shadow transition-colors">
+                        1. Gerar / Atualizar Trinca
+                    </button>
+                    <button onclick="realizarSorteioJusto()" id="btn-sorteio" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded shadow transition-colors opacity-50 cursor-not-allowed" disabled>
+                        2. Sorteio Único
+                    </button>
+                    <button onclick="toggleSorteioAutomatico()" id="btn-auto-sorteio" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded shadow transition-colors opacity-50 cursor-not-allowed" disabled>
+                        3. Auto-Busca Dinâmica (Até 15 pts)
+                    </button>
+                </div>
+            </div>
+
+            <div id="area-simulador-wrapper" class="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-6 hidden">
+                
+                <div id="area-jogos-gerados" class="xl:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    </div>
+
+                <div class="xl:col-span-1 flex flex-col gap-4">
+                    <div class="placar-card flex flex-col h-full">
+                        <div class="placar-header">🏆 Histórico e Caixa</div>
+                        <div class="p-4 flex flex-col flex-grow justify-between">
+                            <div id="placar-conteudo" class="flex-grow text-sm">
+                                </div>
+                            <button onclick="zerarTudo()" class="mt-4 w-full px-3 py-2 bg-red-900/40 hover:bg-red-800 border border-red-700 text-red-300 font-bold rounded shadow transition-colors text-sm">
+                                Resetar Realidade (Voltar ao Base)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="container-log-14" class="mb-6 bg-slate-800/80 border border-orange-500 rounded-lg p-4 hidden">
+                <h3 class="text-orange-400 font-bold mb-3 flex items-center gap-2">
+                    🔥 HALL DA FAMA: Volantes de 14 Pontos Salvos 
+                    <span class="text-xs text-gray-400 font-normal ml-2">(O motor não parou)</span>
+                </h3>
+                <div id="lista-log-14" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-2 custom-scroll">
+                    </div>
+            </div>
+
+            <div id="area-resultado-sorteio" class="bg-gray-900 border border-gray-700 rounded-lg p-5 hidden">
+                <h3 class="text-lg font-bold text-yellow-500 mb-3 text-center">Dezenas Sorteadas (Simulação Atual):</h3>
+                <div id="bolas-sorteadas" class="flex flex-wrap justify-center mb-4"></div>
+                <div id="feedback-premios" class="text-center font-bold text-xl"></div>
+            </div>
+        </div>
+
+        <div class="dashboard-panel mt-8">
+            <h2 class="text-xl font-bold text-white mb-4 border-b border-gray-700 pb-2">Panorama Estatístico (Evolui com os Testes)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="dashboard-content">
+                </div>
+        </div>
+
+        <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-8">
+            </div>
+    </div>
+
+    <script>
+        const NUMEROS_FIBONACCI = [1, 2, 3, 5, 8, 13, 21];
+        const NUMEROS_PRIMOS = [2, 3, 5, 7, 11, 13, 17, 19, 23];
+
+        const historicoRealFixado = [
+            { concurso: 3642, dezenas: [1, 2, 4, 5, 6, 7, 9, 10, 12, 13, 14, 18, 20, 23, 25] },
+            { concurso: 3643, dezenas: [3, 4, 5, 6, 8, 9, 10, 13, 17, 19, 20, 22, 23, 24, 25] },
+            { concurso: 3644, dezenas: [1, 4, 5, 9, 10, 11, 13, 14, 19, 20, 21, 22, 23, 24, 25] },
+            { concurso: 3645, dezenas: [1, 3, 6, 7, 8, 9, 10, 12, 13, 15, 17, 18, 19, 21, 25] },
+            { concurso: 3646, dezenas: [1, 3, 5, 7, 8, 11, 13, 15, 16, 18, 19, 20, 23, 24, 25] },
+            { concurso: 3647, dezenas: [2, 4, 5, 8, 10, 12, 15, 16, 17, 19, 20, 21, 22, 24, 25] },
+            { concurso: 3648, dezenas: [1, 2, 5, 7, 8, 9, 10, 11, 13, 14, 15, 18, 19, 20, 22] },
+            { concurso: 3649, dezenas: [6, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 20, 21, 24, 25] },
+            { concurso: 3650, dezenas: [2, 5, 6, 7, 8, 10, 11, 12, 13, 16, 17, 20, 21, 22, 25] },
+            { concurso: 3651, dezenas: [2, 3, 5, 8, 10, 12, 13, 14, 16, 17, 18, 20, 21, 24, 25] },
+            { concurso: 3652, dezenas: [2, 3, 5, 8, 10, 12, 13, 14, 16, 17, 18, 20, 21, 24, 25] },
+            { concurso: 3653, dezenas: [2, 3, 4, 6, 7, 8, 10, 11, 13, 14, 16, 18, 19, 20, 21] },
+            { concurso: 3654, dezenas: [1, 2, 3, 4, 6, 7, 11, 15, 17, 19, 20, 22, 23, 24, 25] },
+            { concurso: 3655, dezenas: [1, 2, 4, 5, 6, 10, 11, 12, 17, 18, 19, 21, 22, 23, 24] },
+            { concurso: 3656, dezenas: [3, 4, 6, 7, 8, 11, 12, 14, 15, 18, 19, 20, 21, 24, 25] },
+            { concurso: 3657, dezenas: [1, 2, 4, 7, 8, 10, 12, 13, 17, 18, 19, 20, 22, 23, 24] },
+            { concurso: 3658, dezenas: [2, 3, 4, 5, 9, 10, 11, 12, 13, 16, 18, 20, 22, 23, 24] },
+            { concurso: 3659, dezenas: [3, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 23, 25] },
+            { concurso: 3660, dezenas: [1, 2, 5, 6, 7, 8, 10, 11, 12, 14, 17, 18, 22, 23, 24] },
+            { concurso: 3661, dezenas: [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 15, 19, 21, 23, 24] }
+        ];
+
+        let historicoAtivo = [];
+        let alvosEstatisticos = {};
+        let dezenasUltimoConcurso = [];
+        let volantesGerados = [];
+        let resultadoSorteio = [];
+        let sorteioRealizadoNestaRodada = false;
+        
+        let historicoPlacar = { totalSorteios: 0, acertos11: 0, acertos12: 0, acertos13: 0, acertos14: 0, acertos15: 0, totalGasto: 0, totalGanho: 0, saldo: 0 };
+        let rodandoAuto = false;
+        let loopSorteioInterval = null;
+
+        function inicializarApp() {
+            zerarTudo();
+        }
+
+        function zerarTudo() {
+            if (rodandoAuto) toggleSorteioAutomatico();
+
+            historicoAtivo = JSON.parse(JSON.stringify(historicoRealFixado));
+            historicoPlacar = { totalSorteios: 0, acertos11: 0, acertos12: 0, acertos13: 0, acertos14: 0, acertos15: 0, totalGasto: 0, totalGanho: 0, saldo: 0 };
+            sorteioRealizadoNestaRodada = false;
+            
+            document.getElementById('container-log-14').classList.add('hidden');
+            document.getElementById('lista-log-14').innerHTML = '';
+            document.getElementById('area-resultado-sorteio').classList.add('hidden');
+
+            document.getElementById('area-simulador-wrapper').classList.add('hidden');
+            document.getElementById('btn-sorteio').disabled = true;
+            document.getElementById('btn-sorteio').classList.add('opacity-50', 'cursor-not-allowed');
+            document.getElementById('btn-auto-sorteio').disabled = true;
+            document.getElementById('btn-auto-sorteio').classList.add('opacity-50', 'cursor-not-allowed');
+            
+            calcularEstatisticasGlobais();
+            renderizarCards();
+            atualizarPlacarHTML();
+        }
+
+        function embaralhar(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function avaliarFiltros(jogo) {
+            let impares = jogo.filter(n => n % 2 !== 0).length;
+            let repetidas = jogo.filter(n => dezenasUltimoConcurso.includes(n)).length;
+            let soma = jogo.reduce((a, b) => a + b, 0);
+
+            let checkImpares = impares >= (alvosEstatisticos.impares - 1) && impares <= (alvosEstatisticos.impares + 1);
+            let checkRepetidas = repetidas >= (alvosEstatisticos.repetidas - 2) && repetidas <= (alvosEstatisticos.repetidas + 2);
+            let checkSoma = soma >= alvosEstatisticos.somaMin && soma <= alvosEstatisticos.somaMax;
+
+            return checkImpares && checkRepetidas && checkSoma;
+        }
+
+        function construirMatrizSimulada(dezenas, index) {
+            let somaLinhas = [0, 0, 0, 0, 0], somaColunas = [0, 0, 0, 0, 0];
+            let qtdFibo = 0, qtdPrimos = 0, qtdPares = 0, qtdImpares = 0, somaTotalDezenas = 0;
+            let qtdRepetidas = dezenas.filter(n => dezenasUltimoConcurso.includes(n)).length;
+
+            for (let i = 0; i < 25; i++) {
+                let num = i + 1;
+                if (dezenas.includes(num)) {
+                    somaLinhas[Math.floor(i / 5)]++;
+                    somaColunas[i % 5]++;
+                    if (NUMEROS_FIBONACCI.includes(num)) qtdFibo++;
+                    if (NUMEROS_PRIMOS.includes(num)) qtdPrimos++;
+                    if (num % 2 === 0) qtdPares++; else qtdImpares++;
+                    somaTotalDezenas += num;
+                }
+            }
+
+            let cardHtml = `
+                <div id="volante-card-${index}" class="simulado-card relative">
+                    <div class="simulado-header">VOLANTE ${index + 1}</div>
+                    <div class="grid-container">
+            `;
+            for (let l = 0; l < 5; l++) {
+                cardHtml += `<div class="simulado-soma">${somaLinhas[l].toString().padStart(2, '0')}</div>`;
+                for (let c = 0; c < 5; c++) {
+                    let dezenaAtual = (l * 5) + c + 1;
+                    let classeStatus = dezenas.includes(dezenaAtual) ? 'simulado-sorteada' : 'simulado-ausente';
+                    cardHtml += `<div class="celula ${classeStatus}">${dezenaAtual.toString().padStart(2, '0')}</div>`;
+                }
+            }
+            cardHtml += `<div class="simulado-soma"></div>`; 
+            for (let c = 0; c < 5; c++) cardHtml += `<div class="simulado-soma">${somaColunas[c].toString().padStart(2, '0')}</div>`;
+            cardHtml += `</div>
+                    <div class="simulado-stats-table">
+                        <div class="stat-row"><div class="simulado-label">soma dezenas</div><div class="simulado-value">${somaTotalDezenas}</div></div>
+                        <div class="stat-row"><div class="simulado-label">impares</div><div class="simulado-value">${qtdImpares}</div></div>
+                        <div class="stat-row"><div class="simulado-label">primos</div><div class="simulado-value">${qtdPrimos}</div></div>
+                        <div class="stat-row"><div class="simulado-label">repetidas ant.</div><div class="simulado-value text-green-400">${qtdRepetidas}</div></div>
+                        <div class="stat-row"><div class="simulado-label">fibonacci</div><div class="simulado-value">${qtdFibo}</div></div>
+                    </div>
+                    <div class="bg-gray-900 border-t border-gray-700 py-2 text-center text-sm font-bold text-gray-500" id="acertos-v${index}">
+                        Aguardando sorteio...
+                    </div>
+                </div>`;
+            return cardHtml;
+        }
+
+        function formatarMoeda(valor) {
+            return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function atualizarPlacarHTML() {
+            const placarDiv = document.getElementById('placar-conteudo');
+            let totalPremiados = historicoPlacar.acertos11 + historicoPlacar.acertos12 + historicoPlacar.acertos13 + historicoPlacar.acertos14 + historicoPlacar.acertos15;
+
+            let classeSaldo = historicoPlacar.saldo > 0 ? 'text-green-400' : (historicoPlacar.saldo < 0 ? 'text-red-400' : 'text-slate-300');
+            let iconeSaldo = historicoPlacar.saldo > 0 ? '📈' : (historicoPlacar.saldo < 0 ? '📉' : '➖');
+
+            placarDiv.innerHTML = `
+                <div class="flex justify-between items-center border-b border-slate-600 pb-2 mb-2 mt-1">
+                    <span class="text-slate-400 font-bold">Mundos Testados:</span>
+                    <span class="text-white text-lg font-mono">${historicoPlacar.totalSorteios}</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-600 pb-2 mb-3">
+                    <span class="text-slate-400 font-bold">Volantes Premiados:</span>
+                    <span class="text-green-400 text-lg font-mono font-bold">${totalPremiados}</span>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-600 rounded p-2 mb-4 space-y-1">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400 text-xs uppercase tracking-wide">Investimento (Custo)</span>
+                        <span class="text-red-400 font-mono">${formatarMoeda(historicoPlacar.totalGasto)}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400 text-xs uppercase tracking-wide">Retorno (Prêmios)</span>
+                        <span class="text-green-400 font-mono">${formatarMoeda(historicoPlacar.totalGanho)}</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-slate-600 pt-1 mt-1">
+                        <span class="text-slate-300 text-xs font-bold uppercase tracking-wide">Saldo Final</span>
+                        <span class="${classeSaldo} font-mono font-bold text-base">${iconeSaldo} ${formatarMoeda(historicoPlacar.saldo)}</span>
+                    </div>
+                </div>
+
+                <div class="space-y-1 text-xs">
+                    <div class="flex justify-between items-center bg-slate-800 px-2 py-1 rounded border-l-4 border-yellow-400">
+                        <span class="text-slate-300 font-bold">🎯 15 Pontos <span class="text-gray-500 font-normal">(R$ 1.5M)</span></span> 
+                        <span class="font-mono font-bold text-yellow-400 text-base">${historicoPlacar.acertos15}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-800 px-2 py-1 rounded border-l-4 border-orange-500">
+                        <span class="text-slate-300 font-bold">🔥 14 Pontos <span class="text-gray-500 font-normal">(R$ 1.5K)</span></span> 
+                        <span class="font-mono font-bold text-orange-400 text-base">${historicoPlacar.acertos14}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-800/50 px-2 py-1 rounded">
+                        <span class="text-slate-400">13 Pontos <span class="text-gray-600">(R$ 30,00)</span></span> 
+                        <span class="font-mono text-green-400">${historicoPlacar.acertos13}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-800/50 px-2 py-1 rounded">
+                        <span class="text-slate-400">12 Pontos <span class="text-gray-600">(R$ 12,00)</span></span> 
+                        <span class="font-mono text-green-400">${historicoPlacar.acertos12}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-slate-800/50 px-2 py-1 rounded">
+                        <span class="text-slate-400">11 Pontos <span class="text-gray-600">(R$ 6,00)</span></span> 
+                        <span class="font-mono text-green-400">${historicoPlacar.acertos11}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function registrarLog14(volanteIndex, sorteioArr, rodada) {
+            const container = document.getElementById('container-log-14');
+            const lista = document.getElementById('lista-log-14');
+            container.classList.remove('hidden');
+
+            let dezenasHtml = sorteioArr.map(d => 
+                `<span class="dezena-bola pequena ${volantesGerados[volanteIndex].includes(d) ? 'acerto' : 'neutra'}">${d.toString().padStart(2, '0')}</span>`
+            ).join('');
+
+            let logHtml = `
+                <div class="bg-slate-900 border border-slate-700 p-2 rounded flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div class="text-sm">
+                        <span class="text-gray-400">Rodada Evolutiva:</span> <strong class="text-white">#${rodada}</strong> | 
+                        <span class="text-orange-400 font-bold uppercase">Volante ${volanteIndex + 1}</span>
+                    </div>
+                    <div class="flex flex-wrap">${dezenasHtml}</div>
+                </div>
+            `;
+            
+            lista.insertAdjacentHTML('afterbegin', logHtml);
+        }
+
+        // --- SISTEMA DE EVOLUÇÃO DO UNIVERSO ---
+
+        function avancarLinhaDoTempo() {
+            let novoConc = historicoAtivo[historicoAtivo.length - 1].concurso + 1;
+            historicoAtivo.push({ concurso: novoConc, dezenas: resultadoSorteio });
+            historicoAtivo.shift(); // Remove o mais antigo, mantendo a janela de 20
+            calcularEstatisticasGlobais(); // Recalcula os alvos para a nova trinca
+        }
+
+        function gerarJogosEstrategicosInterno() {
+            let tentativas = 0;
+            let limiteTentativas = 20000;
+            let j1, j2, j3;
+            const todasAs25 = Array.from({length: 25}, (_, i) => i + 1);
+
+            while(tentativas < limiteTentativas) {
+                let baseEmbaralhada = embaralhar(todasAs25);
+                j1 = baseEmbaralhada.slice(0, 15);
+                
+                let dezenasForaJ1 = baseEmbaralhada.slice(15, 25);
+                let dezenasEmprestadasJ1 = embaralhar(j1).slice(0, 5);
+                j2 = [...dezenasForaJ1, ...dezenasEmprestadasJ1];
+                
+                j3 = embaralhar(todasAs25).slice(0, 15);
+
+                if(avaliarFiltros(j1) && avaliarFiltros(j2) && avaliarFiltros(j3)) {
+                    break;
+                }
+                tentativas++;
+            }
+            volantesGerados = [j1.sort((a,b)=>a-b), j2.sort((a,b)=>a-b), j3.sort((a,b)=>a-b)];
+        }
+
+        function renderizarVolantesUi() {
+            const areaJogos = document.getElementById('area-jogos-gerados');
+            areaJogos.innerHTML = '';
+            volantesGerados.forEach((volante, idx) => {
+                areaJogos.innerHTML += construirMatrizSimulada(volante, idx);
+            });
+        }
+
+        function acaoGerarTrincaManual() {
+            if (rodandoAuto) toggleSorteioAutomatico();
+            
+            if (sorteioRealizadoNestaRodada) {
+                avancarLinhaDoTempo();
+            }
+            
+            gerarJogosEstrategicosInterno();
+            
+            document.getElementById('area-simulador-wrapper').classList.remove('hidden');
+            renderizarVolantesUi();
+            
+            document.getElementById('btn-sorteio').disabled = false;
+            document.getElementById('btn-sorteio').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('btn-auto-sorteio').disabled = false;
+            document.getElementById('btn-auto-sorteio').classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('area-resultado-sorteio').classList.add('hidden');
+            
+            sorteioRealizadoNestaRodada = false;
+        }
+
+        function toggleSorteioAutomatico() {
+            const btnAuto = document.getElementById('btn-auto-sorteio');
+            const btnManual = document.getElementById('btn-sorteio');
+
+            if(rodandoAuto) {
+                clearInterval(loopSorteioInterval);
+                rodandoAuto = false;
+                btnAuto.innerHTML = "3. Auto-Busca Dinâmica (Até 15 pts)";
+                btnAuto.classList.replace('bg-red-600', 'bg-purple-600');
+                btnAuto.classList.replace('hover:bg-red-700', 'hover:bg-purple-700');
+                btnManual.disabled = false;
+                btnManual.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                // Ao parar o motor, atualiza a grande tabela histórica inferior que estava pausada para manter performance
+                renderizarCards(); 
+            } else {
+                rodandoAuto = true;
+                btnAuto.innerHTML = "🛑 Parar Busca Manualmente";
+                btnAuto.classList.replace('bg-purple-600', 'bg-red-600');
+                btnAuto.classList.replace('hover:bg-purple-700', 'hover:bg-red-700');
+                btnManual.disabled = true;
+                btnManual.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                // Aceleramos o intervalo para 40ms. Fluidez visual com super processamento.
+                loopSorteioInterval = setInterval(() => {
+                    realizarSorteioJusto();
+                }, 40); 
+            }
+        }
+
+        function realizarSorteioJusto() {
+            // MOTOR DE MUNDOS PARALELOS: Se já houve um sorteio, avança a história e gera nova trinca
+            if (sorteioRealizadoNestaRodada) {
+                avancarLinhaDoTempo();
+                gerarJogosEstrategicosInterno();
+            }
+
+            // Realiza o Sorteio
+            const todasAs25 = Array.from({length: 25}, (_, i) => i + 1);
+            resultadoSorteio = embaralhar(todasAs25).slice(0, 15).sort((a, b) => a - b);
+
+            // Se rodando no manual, atualiza também a grande tabela de histórico visualmente.
+            // No automático, pulamos isso para não travar o navegador.
+            if (!rodandoAuto) renderizarCards();
+
+            // Atualiza a tela dos 3 volantes sempre para dar o efeito visual Matrix
+            renderizarVolantesUi();
+
+            // Renderiza Bolas do Sorteio
+            const areaSorteio = document.getElementById('area-resultado-sorteio');
+            const bolasSorteio = document.getElementById('bolas-sorteadas');
+            areaSorteio.classList.remove('hidden');
+            bolasSorteio.innerHTML = resultadoSorteio.map(d => 
+                `<span class="dezena-bola acerto">${d.toString().padStart(2, '0')}</span>`
+            ).join('');
+
+            conferirJogosEAtualizarPlacar();
+            sorteioRealizadoNestaRodada = true;
+        }
+
+        function conferirJogosEAtualizarPlacar() {
+            historicoPlacar.totalSorteios++;
+            historicoPlacar.totalGasto += 10.5; // R$ 3,50 por volante x 3
+            
+            let maxAcertosDaRodada = 0;
+            let ganhoDaRodada = 0;
+
+            volantesGerados.forEach((volante, idx) => {
+                let acertos = volante.filter(d => resultadoSorteio.includes(d)).length;
+                if(acertos > maxAcertosDaRodada) maxAcertosDaRodada = acertos;
+
+                // Contabiliza Ganhos 
+                if (acertos === 11) { historicoPlacar.acertos11++; ganhoDaRodada += 6; }
+                else if (acertos === 12) { historicoPlacar.acertos12++; ganhoDaRodada += 12; }
+                else if (acertos === 13) { historicoPlacar.acertos13++; ganhoDaRodada += 30; }
+                else if (acertos === 14) { 
+                    historicoPlacar.acertos14++; 
+                    ganhoDaRodada += 1500; 
+                    // Destaque visual
+                    document.getElementById(`volante-card-${idx}`).classList.add('destaque-14');
+                    // Salva no Log Permanentemente
+                    registrarLog14(idx, resultadoSorteio, historicoPlacar.totalSorteios);
+                }
+                else if (acertos === 15) { historicoPlacar.acertos15++; ganhoDaRodada += 1500000; }
+
+                let divAcerto = document.getElementById(`acertos-v${idx}`);
+                divAcerto.classList.remove('text-gray-500', 'text-green-400', 'bg-green-900/30', 'text-red-400', 'text-yellow-400', 'bg-yellow-900/30', 'text-orange-400', 'bg-orange-900/30');
+                
+                if (acertos === 15) {
+                    divAcerto.classList.add('text-yellow-400', 'bg-yellow-900/30');
+                    divAcerto.innerHTML = `🏆 O MILHÃO CHEGOU! 15 ACERTOS! 🏆`;
+                } else if (acertos === 14) {
+                    divAcerto.classList.add('text-orange-400', 'bg-orange-900/30');
+                    divAcerto.innerHTML = `🔥 QUASE! 14 ACERTOS! 🔥`;
+                } else if (acertos >= 11) {
+                    divAcerto.classList.add('text-green-400', 'bg-green-900/30');
+                    divAcerto.innerHTML = `🌟 PREMIADO! ${acertos} ACERTOS! 🌟`;
+                } else {
+                    divAcerto.classList.add('text-red-400');
+                    divAcerto.innerHTML = `❌ ${acertos} Acertos`;
+                }
+            });
+
+            historicoPlacar.totalGanho += ganhoDaRodada;
+            historicoPlacar.saldo = historicoPlacar.totalGanho - historicoPlacar.totalGasto;
+
+            atualizarPlacarHTML();
+
+            const feedback = document.getElementById('feedback-premios');
+            if (maxAcertosDaRodada === 15) {
+                feedback.innerHTML = `<span class="text-green-500">🏆 INACREDITÁVEL! 15 PONTOS ALCANÇADOS! 🏆</span>`;
+            } else if (maxAcertosDaRodada === 14) {
+                feedback.innerHTML = `<span class="text-orange-400">🔥 EXCELENTE! 14 PONTOS! VOLANTE SALVO NO HALL DA FAMA! 🔥</span>`;
+            } else if (maxAcertosDaRodada >= 11) {
+                feedback.innerHTML = `<span class="text-blue-400">✔️ Lucro! +${formatarMoeda(ganhoDaRodada)} retornaram ao caixa na rodada.</span>`;
+            } else {
+                feedback.innerHTML = `<span class="text-red-400">❌ Nenhum bilhete premiado nesta simulação (-R$ 10,50).</span>`;
+            }
+
+            // O motor só freia definitivamente ao cravar a perfeição absoluta.
+            if (rodandoAuto && maxAcertosDaRodada === 15) {
+                toggleSorteioAutomatico();
+            }
+        }
+
+        // --- DASHBOARD E ESTATÍSTICAS ---
+
+        function calcularEstatisticasGlobais() {
+            const painel = document.getElementById('dashboard-content');
+            dezenasUltimoConcurso = historicoAtivo[historicoAtivo.length - 1].dezenas;
+
+            let freqImpares = {}, freqRepetidos = {}, freqSomaFaixa = { '< 170': 0, '170 a 179': 0, '180 a 189': 0, '190 a 199': 0, '200 a 209': 0, '210 a 220': 0, '> 220': 0 };
+
+            for (let i = 0; i < historicoAtivo.length; i++) {
+                let dezenas = historicoAtivo[i].dezenas;
+                
+                let soma = dezenas.reduce((acc, curr) => acc + curr, 0);
+                if (soma < 170) freqSomaFaixa['< 170']++;
+                else if (soma >= 170 && soma <= 179) freqSomaFaixa['170 a 179']++;
+                else if (soma >= 180 && soma <= 189) freqSomaFaixa['180 a 189']++;
+                else if (soma >= 190 && soma <= 199) freqSomaFaixa['190 a 199']++;
+                else if (soma >= 200 && soma <= 209) freqSomaFaixa['200 a 209']++;
+                else if (soma >= 210 && soma <= 220) freqSomaFaixa['210 a 220']++;
+                else freqSomaFaixa['> 220']++;
+
+                let impares = dezenas.filter(n => n % 2 !== 0).length;
+                freqImpares[impares] = (freqImpares[impares] || 0) + 1;
+
+                if (i > 0) {
+                    let repetidos = dezenas.filter(n => historicoAtivo[i-1].dezenas.includes(n)).length;
+                    freqRepetidos[repetidos] = (freqRepetidos[repetidos] || 0) + 1;
+                }
+            }
+
+            const getTop = (obj) => Object.keys(obj).reduce((a, b) => obj[a] > obj[b] ? a : b);
+            
+            let topImpares = parseInt(getTop(freqImpares));
+            let topRepetidas = parseInt(getTop(freqRepetidos));
+            let topFaixa = getTop(freqSomaFaixa);
+
+            let faixaLimites = topFaixa.split(' a ');
+            let sMin = 180, sMax = 210; 
+            if(faixaLimites.length === 2) {
+                sMin = parseInt(faixaLimites[0]) - 5; 
+                sMax = parseInt(faixaLimites[1]) + 5;
+            }
+
+            alvosEstatisticos = { impares: topImpares, repetidas: topRepetidas, somaMin: sMin, somaMax: sMax };
+
+            let resultadosInvertidos = [...historicoAtivo].reverse();
+            let dezenasDoCicloAtual = new Set();
+            for (let i = 0; i < resultadosInvertidos.length; i++) {
+                let conjuntoTemporario = new Set(dezenasDoCicloAtual);
+                resultadosInvertidos[i].dezenas.forEach(d => conjuntoTemporario.add(d));
+                if (conjuntoTemporario.size === 25) break;
+                else resultadosInvertidos[i].dezenas.forEach(d => dezenasDoCicloAtual.add(d));
+            }
+
+            let faltamParaFechar = [];
+            for (let i = 1; i <= 25; i++) {
+                if (!dezenasDoCicloAtual.has(i)) faltamParaFechar.push(i);
+            }
+
+            painel.innerHTML = `
+                <div class="stat-box cycle-box">
+                    <div>
+                        <div class="stat-title">Ciclo Evolutivo Dinâmico</div>
+                        <div class="text-gray-300 text-sm mb-2">Faltam <b>${faltamParaFechar.length}</b> dezenas:</div>
+                    </div>
+                    <div class="flex flex-wrap mt-2">${faltamParaFechar.map(n => `<span class="dezena-ciclo">${n.toString().padStart(2, '0')}</span>`).join('')}</div>
+                </div>
+
+                <div class="stat-box gold-box">
+                    <div>
+                        <div class="stat-title text-yellow-500">Soma de Ouro (Auto-Ajustada)</div>
+                        <div class="text-gray-300 text-sm mb-3">O motor lê as mudanças de padrão e agora exige somas entre:</div>
+                    </div>
+                    <div class="text-2xl text-white font-bold text-center bg-yellow-900/30 border border-yellow-600 rounded p-2">
+                        ${sMin} até ${sMax}
+                    </div>
+                </div>
+
+                <div class="stat-box">
+                    <div>
+                        <div class="stat-title">Filtros de Perfil Móvel</div>
+                        <ul class="text-gray-300 text-sm space-y-2 mt-2">
+                            <li class="flex justify-between border-b border-gray-700 pb-1"><span>Alvo de Ímpares:</span> <b class="text-white">${topImpares} dezenas</b></li>
+                            <li class="flex justify-between"><span>Alvo de Repetidas:</span> <b class="text-white">${topRepetidas} dezenas</b></li>
+                        </ul>
+                        <div class="text-xs text-gray-500 mt-2">*Margem algorítmica de ±1, recalibrada a cada nova rodada testada.</div>
+                    </div>
+                </div>
+
+                <div class="stat-box alert-box">
+                    <div>
+                        <div class="stat-title">Estratégia de Mundos Paralelos</div>
+                        <p class="text-gray-300 text-sm leading-relaxed">
+                            A cada simulação, o tempo avança. O sistema analisa o sorteio gerado, insere-o no histórico, recria os alvos matemáticos e gera 3 novos bilhetes para a rodada seguinte.
+                        </p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderizarCards() {
+            const container = document.getElementById('cards-container');
+            container.innerHTML = ''; 
+            const resultadosInvertidos = [...historicoAtivo].reverse();
+
+            resultadosInvertidos.forEach(resultado => {
+                const dezenas = resultado.dezenas;
+                let somaLinhas = [0, 0, 0, 0, 0], somaColunas = [0, 0, 0, 0, 0];
+                let qtdFibo = 0, qtdPrimos = 0, qtdPares = 0, qtdImpares = 0, somaTotalDezenas = 0;
+
+                for (let i = 0; i < 25; i++) {
+                    let num = i + 1;
+                    if (dezenas.includes(num)) {
+                        somaLinhas[Math.floor(i / 5)]++;
+                        somaColunas[i % 5]++;
+                        if (NUMEROS_FIBONACCI.includes(num)) qtdFibo++;
+                        if (NUMEROS_PRIMOS.includes(num)) qtdPrimos++;
+                        if (num % 2 === 0) qtdPares++; else qtdImpares++;
+                        somaTotalDezenas += num;
+                    }
+                }
+
+                let cardHtml = `
+                    <div class="resultado-card">
+                        <div class="card-header">CONCURSO ${resultado.concurso}</div>
+                        <div class="grid-container">
+                `;
+                for (let l = 0; l < 5; l++) {
+                    cardHtml += `<div class="celula-soma">${somaLinhas[l].toString().padStart(2, '0')}</div>`;
+                    for (let c = 0; c < 5; c++) {
+                        let dezenaAtual = (l * 5) + c + 1;
+                        let classeStatus = dezenas.includes(dezenaAtual) ? 'dezena-sorteada' : 'dezena-ausente';
+                        cardHtml += `<div class="celula ${classeStatus}">${dezenaAtual.toString().padStart(2, '0')}</div>`;
+                    }
+                }
+                cardHtml += `<div class="celula-soma"></div>`; 
+                for (let c = 0; c < 5; c++) cardHtml += `<div class="celula-soma">${somaColunas[c].toString().padStart(2, '0')}</div>`;
+                cardHtml += `</div><div class="stats-table">
+                            <div class="stat-row"><div class="stat-label">fibonacci</div><div class="stat-value text-blue-700">${qtdFibo}</div></div>
+                            <div class="stat-row"><div class="stat-label">soma dezenas</div><div class="stat-value text-blue-700">${somaTotalDezenas}</div></div>
+                            <div class="stat-row"><div class="stat-label">primos</div><div class="stat-value text-blue-700">${qtdPrimos}</div></div>
+                            <div class="stat-row"><div class="stat-label">impares</div><div class="stat-value text-blue-700">${qtdImpares}</div></div>
+                            <div class="stat-row"><div class="stat-label">pares</div><div class="stat-value text-blue-700">${qtdPares}</div></div>
+                        </div></div>`;
+                container.innerHTML += cardHtml;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', inicializarApp);
+    </script>
+</body>
+</html>
